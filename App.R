@@ -1,9 +1,8 @@
-# Load required libraries
 library(shiny)
 library(shinydashboard)
 library(shinyWidgets)
 
-# Define UI
+# UI Code
 ui <- dashboardPage(
   dashboardHeader(title = "DIG Trial Analysis Dashboard", titleWidth = 300),
   dashboardSidebar(
