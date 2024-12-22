@@ -11,6 +11,7 @@ ui <- dashboardPage(
       menuItem("Overview", tabName = "overview", icon = icon("dashboard")),
       menuItem("Demographics", tabName = "demographics", icon = icon("users")),
       menuItem("Clinical Data", tabName = "clinical", icon = icon("file-medical")),
+      menuItem("Patient Outcome", tabName = "outcomes", icon = icon("user-check")),
       menuItem("Mortality Overview", tabName = "mortality", icon = icon("skull-crossbones")),
       menuItem("Adverse Events", tabName = "adverse", icon = icon("exclamation-triangle")),
       menuItem("Risk Analysis", tabName = "risk", icon = icon("chart-bar"))
@@ -135,6 +136,26 @@ ui <- dashboardPage(
                   sliderInput("ageRange", "Select Age Range:", min = 0, max = 100, value = c(20, 60))
                 )
               )
+      ),
+      tabItem(
+        tabName = "outcomes",
+        fluidRow(
+          box(
+            title = "Outcome Trends", status = "primary", solidHeader = TRUE, width = 6,
+            plotOutput("outcomeTrend")
+          ),
+          box(
+            title = "Outcome Statistics", status = "primary", solidHeader = TRUE, width = 6,
+            verbatimTextOutput("outcomeSummary")
+          )
+        ),
+        fluidRow(
+          box(
+            title = "Analysis Options", status = "info", solidHeader = TRUE, width = 12,
+            selectInput("outcomeMetric", "Select Metric:", choices = NULL),
+            dateRangeInput("dateRange", "Select Date Range:")
+          )
+        )
       ),
       tabItem(tabName = "mortality",
               fluidRow(
