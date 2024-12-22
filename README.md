@@ -52,6 +52,3 @@ Visualizations: Integrated use of plotOutput for graphical representation of tre
 Data Tables: Dynamic tables powered by DT for easy exploration and sorting of trial data.
 
 Custom Styling: Consistent pastel color schemes and FontAwesome icons enhance usability and aesthetics.
-
-Purpose and Goals:
-The dashboard aims to simplify data exploration and facilitate informed decision-making by transforming complex datasets into an accessible and user-friendly interface. It leverages interactivity and dynamic content to ensure that users can uncover meaningful patterns and insights efficiently.
