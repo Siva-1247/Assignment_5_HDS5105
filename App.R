@@ -10,6 +10,7 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("Overview", tabName = "overview", icon = icon("dashboard")),
       menuItem("Demographics", tabName = "demographics", icon = icon("users")),
+      menuItem("Clinical Data", tabName = "clinical", icon = icon("file-medical")),
       menuItem("Mortality Overview", tabName = "mortality", icon = icon("skull-crossbones")),
       menuItem("Adverse Events", tabName = "adverse", icon = icon("exclamation-triangle")),
       menuItem("Risk Analysis", tabName = "risk", icon = icon("chart-bar"))
@@ -119,6 +120,19 @@ ui <- dashboardPage(
                   solidHeader = TRUE,
                   width = 12,
                   plotOutput("age_treatment_plot")
+                )
+              )
+      ),
+      tabItem(tabName = "clinical",
+              fluidRow(
+                box(
+                  title = "Clinical Measures", status = "primary", solidHeader = TRUE, width = 6,
+                  plotOutput("clinicalPlot")
+                ),
+                box(
+                  title = "Filter Options", status = "info", solidHeader = TRUE, width = 6,
+                  selectInput("clinicalVariable", "Select Variable:", choices = NULL),
+                  sliderInput("ageRange", "Select Age Range:", min = 0, max = 100, value = c(20, 60))
                 )
               )
       ),
