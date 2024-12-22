@@ -1,296 +1,205 @@
-# Install required packages if not already installed
-if (!require(pacman)) install.packages("pacman")
-pacman::p_load(shiny, shinydashboard, DT, ggplot2, dplyr, plotly, corrplot)
+# Load required libraries
+library(shiny)
+library(shinydashboard)
+library(shinyWidgets)
 
-# UI
+# Define UI
 ui <- dashboardPage(
-  dashboardHeader(title = "DIG Trial Analysis"),
-  
+  dashboardHeader(title = "DIG Trial Analysis Dashboard", titleWidth = 300),
   dashboardSidebar(
     sidebarMenu(
       menuItem("Overview", tabName = "overview", icon = icon("dashboard")),
-      menuItem("Patient Data", tabName = "data", icon = icon("table")),
-      menuItem("Analysis", tabName = "analysis", icon = icon("chart-line")),
-      menuItem("Survival Analysis", tabName = "survival", icon = icon("heartbeat"))
+      menuItem("Demographics", tabName = "demographics", icon = icon("users")),
+      menuItem("Mortality Overview", tabName = "mortality", icon = icon("skull-crossbones")),
+      menuItem("Adverse Events", tabName = "adverse", icon = icon("exclamation-triangle")),
+      menuItem("Risk Analysis", tabName = "risk", icon = icon("chart-bar"))
     )
   ),
   
+  # Dashboard Body
   dashboardBody(
+    tags$head(
+      
+      tags$style(HTML("
+      
+       .main-header {
+        background-color: #d8b4a0 !important;  /* Soft brown pastel */
+        color: #ffffff !important;            /* White text for contrast */
+      }
+      .main-header .logo {
+        background-color: #c9a99b !important; /* Slightly darker soft brown */
+        color: #ffffff !important;
+      }
+      .main-header .navbar {
+        background-color: #d8b4a0 !important; /* Matches the header background */
+      }
+      .main-sidebar {
+        background-color: #f4e1d2 !important; /* Light pastel brown */
+      }
+      .main-sidebar .sidebar-menu > li.active > a {
+        background-color: #f9c9d2 !important; /* Soft pastel pink for active item */
+        color: #4a2c2a !important;            /* Darker brown text */
+      }
+      .main-sidebar .sidebar-menu > li > a {
+        color: #4a2c2a !important;            /* Dark brown text for menu items */
+      }
+      .main-sidebar .sidebar-menu > li > a:hover {
+        background-color: #d8b4a0 !important; /* Highlight on hover */
+        color: #ffffff !important;            /* White text for contrast */
+      }
+        .box { 
+          background-color: #f4e1d2 !important;  /* Pastel light brown */
+          border-color: #d8b4a0 !important;      /* Soft brown border */
+        }
+        
+        .box .box-header {
+          background-color: #f9c9d2 !important;  /* Soft pastel pink */
+          color: #4a2c2a !important;              /* Darker brown text */
+        }
+        
+        .box .box-footer {
+          background-color: #f9c9d2 !important;  /* Soft pastel pink */
+          color: #4a2c2a !important;              /* Darker brown text */
+        }
+        
+        .value-box {
+          background-color: #f0d1cb !important;  /* Light pastel pink */
+          color: #6a4e3c !important;              /* Deep brown text */
+        }
+      "))
+     ),
+    
     tabItems(
       # Overview Tab
       tabItem(tabName = "overview",
               fluidRow(
-                valueBoxOutput("total_patients", width = 3),
-                valueBoxOutput("death_rate", width = 3),
-                valueBoxOutput("avg_age", width = 3),
-                valueBoxOutput("avg_ef", width = 3)
-              ),
+                box(
+                title = "Summary Statistics",
+                solidHeader = TRUE,
+                width = 12,
+                fluidRow(
+                  column(width = 3, valueBoxOutput("total_patients")),
+                  column(width = 3, valueBoxOutput("mortality_rate")),
+                  column(width = 3, valueBoxOutput("hospitalization_rate")),
+                  column(width = 3, valueBoxOutput("median_followup"))
+              ))),
               fluidRow(
+                # Key Findings Box
                 box(
-                  title = "Age Distribution",
-                  status = "primary",
+                  title = "Study Overview",
                   solidHeader = TRUE,
-                  plotlyOutput("age_hist")
-                ),
-                box(
-                  title = "Ejection Fraction Distribution",
-                  status = "primary",
-                  solidHeader = TRUE,
-                  plotlyOutput("ef_hist")
+                  width = 12,
+                  textOutput("study_summary")
                 )
               )
       ),
       
-      # Patient Data Tab
-      tabItem(tabName = "data",
+      # Demographics Tab
+      tabItem(tabName = "demographics",
               fluidRow(
+                # Gender and Race Distribution
                 box(
-                  title = "Filter Data",
-                  status = "primary",
+                  title = "Patient Demographics",
+                  solidHeader = TRUE,
+                  width = 6,
+                  plotOutput("gender_race_plot")
+                ),
+                # Age Distribution
+                box(
+                  title = "Age Distribution",
+                  solidHeader = TRUE,
+                  width = 6,
+                  plotOutput("age_dist_plot")
+                )
+              ),
+              fluidRow(
+                # Age by Treatment Group
+                box(
+                  title = "Age by Treatment Group",
                   solidHeader = TRUE,
                   width = 12,
-                  fluidRow(
-                    column(4, 
-                           sliderInput("age_range", 
-                                       "Age Range:",
-                                       min = 0, max = 100,
-                                       value = c(0, 100)
-                           )
-                    ),
-                    column(4,
-                           sliderInput("ef_range",
-                                       "Ejection Fraction Range:",
-                                       min = 0, max = 100,
-                                       value = c(0, 100)
-                           )
-                    ),
-                    column(4,
-                           selectInput("death",
-                                       "Death Status:",
-                                       choices = c("All", "Alive", "Deceased")
-                           )
-                    )
+                  plotOutput("age_treatment_plot")
+                )
+              )
+      ),
+      tabItem(tabName = "mortality",
+              fluidRow(
+                # Controls for dynamic table filtering
+                box(
+                  title = "Mortality Analysis",
+                  solidHeader = TRUE,
+                  width = 12,
+                  column(4,
+                         selectInput("mortality_var", "Variable to Stratify By:",
+                                     choices = c("Age" = "AGE", "Treatment" = "TRTMT", "Gender" = "SEX", "Diabetes" = "DIABETES"))
+                  ),
+                  column(4,
+                         selectInput("mortality_filter", "Filter by Mortality Status:",
+                                     choices = c("All", "Alive", "Dead"))
                   )
                 )
               ),
               fluidRow(
+                # Mortality table
                 box(
-                  title = "Patient Records",
-                  status = "primary",
+                  title = "Mortality Table",
                   solidHeader = TRUE,
                   width = 12,
-                  DTOutput("patient_table")
+                  DTOutput("mortality_table")
                 )
               )
       ),
-      
-      # Analysis Tab
-      tabItem(tabName = "analysis",
+      # Adverse Events Tab
+      tabItem(tabName = "adverse",
               fluidRow(
+                # Total Hospitalizations
                 box(
-                  title = "Correlation Analysis",
-                  status = "primary",
+                  title = "Number of Hospitalizations",
                   solidHeader = TRUE,
-                  plotOutput("correlation_plot")
+                  width = 6,
+                  plotOutput("total_hosp_plot")
                 ),
+                # Cause of Death
                 box(
-                  title = "Variable Relationships",
-                  status = "primary",
+                  title = "Cause of Death Distribution",
                   solidHeader = TRUE,
-                  selectInput("var1", "Select X Variable:", ""),
-                  selectInput("var2", "Select Y Variable:", ""),
-                  plotlyOutput("scatter_plot")
+                  width = 6,
+                  plotOutput("death_cause_plot")
                 )
               )
       ),
       
-      # Survival Analysis Tab
-      tabItem(tabName = "survival",
+      # Risk Analysis Tab
+      tabItem(tabName = "risk",
               fluidRow(
+                # Forest Plot
                 box(
-                  title = "Survival Analysis",
-                  status = "primary",
+                  title = "Risk Factors (Hazard Ratios)",
                   solidHeader = TRUE,
-                  width = 12,
-                  selectInput("group_var", 
-                              "Group By:",
-                              choices = c("Treatment" = "TRTMT",
-                                          "Gender" = "SEX",
-                                          "Previous MI" = "PREVMI",
-                                          "Diabetes" = "DIABETES"),
-                              selected = "TRTMT"
-                  ),
-                  plotlyOutput("survival_plot")
+                  width = 6,
+                  plotOutput("forest_plot")
+                ),
+                # Correlation Heatmap
+                box(
+                  title = "Variable Correlations",
+                  solidHeader = TRUE,
+                  width = 6,
+                  plotOutput("correlation_plot")
                 )
               ),
               fluidRow(
+                # Summary Statistics Table
                 box(
-                  title = "Risk Factors",
-                  status = "primary",
+                  title = "Key Statistics",
                   solidHeader = TRUE,
                   width = 12,
-                  plotlyOutput("risk_factors")
+                  DTOutput("summary_table")
                 )
               )
       )
     )
   )
 )
+server <- function(input, output) { }
 
-# Server
-server <- function(input, output, session) {
-  # Load data
-  dig_data <- reactive({
-    read.csv("DIG.csv")
-  })
-  
-  # Update select inputs based on data
-  observe({
-    nums <- names(select_if(dig_data(), is.numeric))
-    updateSelectInput(session, "var1", choices = nums)
-    updateSelectInput(session, "var2", choices = nums)
-  })
-  
-  # Overview outputs
-  output$total_patients <- renderValueBox({
-    valueBox(
-      nrow(dig_data()),
-      "Total Patients",
-      icon = icon("users"),
-      color = "blue"
-    )
-  })
-  
-  output$death_rate <- renderValueBox({
-    death_rate <- mean(dig_data()$DEATH) * 100
-    valueBox(
-      paste0(round(death_rate, 1), "%"),
-      "Mortality Rate",
-      icon = icon("percent"),
-      color = "red"
-    )
-  })
-  
-  output$avg_age <- renderValueBox({
-    valueBox(
-      round(mean(dig_data()$AGE), 1),
-      "Average Age",
-      icon = icon("calendar"),
-      color = "green"
-    )
-  })
-  
-  output$avg_ef <- renderValueBox({
-    valueBox(
-      round(mean(dig_data()$EJF_PER), 1),
-      "Average EF%",
-      icon = icon("heart"),
-      color = "purple"
-    )
-  })
-  
-  # Age histogram
-  output$age_hist <- renderPlotly({
-    plot_ly(data = dig_data(), x = ~AGE, type = "histogram",
-            marker = list(color = "rgba(56, 128, 139, 0.7)",
-                          line = list(color = "rgba(56, 128, 139, 1)",
-                                      width = 1))) %>%
-      layout(title = "Age Distribution",
-             xaxis = list(title = "Age"),
-             yaxis = list(title = "Count"))
-  })
-  
-  # EF histogram
-  output$ef_hist <- renderPlotly({
-    plot_ly(data = dig_data(), x = ~EJF_PER, type = "histogram",
-            marker = list(color = "rgba(139, 56, 56, 0.7)",
-                          line = list(color = "rgba(139, 56, 56, 1)",
-                                      width = 1))) %>%
-      layout(title = "Ejection Fraction Distribution",
-             xaxis = list(title = "Ejection Fraction (%)"),
-             yaxis = list(title = "Count"))
-  })
-  
-  # Filtered data
-  filtered_data <- reactive({
-    data <- dig_data()
-    data <- data[data$AGE >= input$age_range[1] & data$AGE <= input$age_range[2], ]
-    data <- data[data$EJF_PER >= input$ef_range[1] & data$EJF_PER <= input$ef_range[2], ]
-    
-    if (input$death != "All") {
-      data <- data[data$DEATH == (input$death == "Deceased"), ]
-    }
-    data
-  })
-  
-  # Patient table
-  output$patient_table <- renderDT({
-    datatable(filtered_data(),
-              options = list(pageLength = 10,
-                             scrollX = TRUE))
-  })
-  
-  # Correlation plot
-  output$correlation_plot <- renderPlot({
-    nums <- select_if(dig_data(), is.numeric)
-    correlation <- cor(nums)
-    corrplot(correlation, method = "color", type = "upper",
-             tl.col = "black", tl.srt = 45)
-  })
-  
-  # Scatter plot
-  output$scatter_plot <- renderPlotly({
-    plot_ly(data = dig_data(),
-            x = as.formula(paste0("~", input$var1)),
-            y = as.formula(paste0("~", input$var2)),
-            type = "scatter", mode = "markers",
-            marker = list(color = "rgba(56, 128, 139, 0.5)")) %>%
-      layout(title = paste(input$var1, "vs", input$var2),
-             xaxis = list(title = input$var1),
-             yaxis = list(title = input$var2))
-  })
-  
-  # Survival plot
-  output$survival_plot <- renderPlotly({
-    # Create Kaplan-Meier plot using plotly
-    data <- dig_data()
-    group_var <- input$group_var
-    
-    # Simple survival curve by group
-    plot_ly() %>%
-      add_trace(data = data[data[[group_var]] == unique(data[[group_var]])[1], ],
-                x = ~FOLLOWUP, y = ~cumsum(!DEATH)/sum(!DEATH),
-                name = paste(group_var, "Group 1"),
-                type = "scatter", mode = "lines") %>%
-      add_trace(data = data[data[[group_var]] == unique(data[[group_var]])[2], ],
-                x = ~FOLLOWUP, y = ~cumsum(!DEATH)/sum(!DEATH),
-                name = paste(group_var, "Group 2"),
-                type = "scatter", mode = "lines") %>%
-      layout(title = paste("Survival Analysis by", group_var),
-             xaxis = list(title = "Follow-up Time (days)"),
-             yaxis = list(title = "Survival Probability"))
-  })
-  
-  # Risk factors plot
-  output$risk_factors <- renderPlotly({
-    data <- dig_data()
-    risk_factors <- data.frame(
-      Factor = c("Diabetes", "Previous MI", "Treatment"),
-      Death_Rate = c(
-        mean(data$DEATH[data$DIABETES == 1]),
-        mean(data$DEATH[data$PREVMI == 1]),
-        mean(data$DEATH[data$TRTMT == 1])
-      )
-    )
-    
-    plot_ly(data = risk_factors, x = ~Factor, y = ~Death_Rate,
-            type = "bar",
-            marker = list(color = "rgba(56, 128, 139, 0.7)")) %>%
-      layout(title = "Death Rate by Risk Factor",
-             xaxis = list(title = "Risk Factor"),
-             yaxis = list(title = "Death Rate"))
-  })
-}
-
-# Run the app
 shinyApp(ui = ui, server = server)
