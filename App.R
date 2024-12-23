@@ -3,6 +3,7 @@ library(shinydashboard)
 library(shinyWidgets)
 library(readr)
 library(DT)
+library(dplyr)
 
 DIG <- read_csv("DIG.csv")
 
@@ -108,15 +109,22 @@ ui <- dashboardPage(
                   title = "Summary Statistics",
                   solidHeader = TRUE,
                   width = 12,
-                  tableOutput("summary_table")
-                 )),
+                  div(
+                    style = "display: flex; justify-content: space-around; align-items: center; gap: 10px; padding: 10px;",
+                    valueBoxOutput("total_patients", width = 3),
+                    valueBoxOutput("mortality_rate", width = 3),
+                    valueBoxOutput("hospitalization_rate", width = 3),
+                    valueBoxOutput("median_followup", width = 3)
+                  )
+                )
+              ),
               fluidRow(
                 # Key Findings Box
                 box(
                   title = "Study Overview",
                   solidHeader = TRUE,
                   width = 12,
-                  dataTableOutput("study_summary")
+                  textOutput("study_summary")
                 )
               )
       ),
@@ -125,21 +133,31 @@ ui <- dashboardPage(
       
       tabItem(tabName = "demographics",
               fluidRow(
-                box(title = "Filter Demographics", solidHeader = TRUE, width = 12,
-                    radioButtons(inputId = "RACE", label = "Select Patient Race", choices = c("White", "Non-white")),
-                    radioButtons(inputId = "SEX", label = "Select Patient Sex", choices = c("Female", "Male")),
-                    sliderInput("AGE", "Select Age Range:", min = 20, max = 100, value = c(40, 50))),
-                
-                box(title = "Age Distribution", solidHeader = TRUE, width = 12,
-                    radioButtons(inputId = "TRTMT", label = "Select Treatment Group", choices = c("Placebo", "Treatment"))
+                # Gender and Race Distribution
+                box(
+                  title = "Patient Demographics",
+                  solidHeader = TRUE,
+                  width = 6,
+                  plotOutput("gender_race_plot")
+                ),
+                # Age Distribution
+                box(
+                  title = "Age Distribution",
+                  solidHeader = TRUE,
+                  width = 6,
+                  plotOutput("age_dist_plot")
                 )
               ),
               fluidRow(
-                box(title = "Patient Demographics", solidHeader = TRUE, width = 6, plotOutput("patient_demographics")),
-                box(title = "Age Distribution", solidHeader = TRUE, width = 6, plotOutput("age_distribution"))
+                # Age by Treatment Group
+                box(
+                  title = "Age by Treatment Group",
+                  solidHeader = TRUE,
+                  width = 12,
+                  plotOutput("age_treatment_plot")
+                )
               )
       ),
-      
       tabItem(tabName = "clinical",
               fluidRow(
                 box(
@@ -156,13 +174,9 @@ ui <- dashboardPage(
       tabItem(
         tabName = "outcomes",
         fluidRow(
-          box(title = "Filter Primary Outcome", solidHeader = TRUE, width = 12,
-              radioButtons(inputId = "TRTMT", label = "Select Treatment Group", choices = c("Placebo", "Treatment"))
-              )),
-        fluidRow(
           box(
-            title = "Primary Outcome", status = "primary", solidHeader = TRUE, width = 6,
-            plotOutput("primary_outcome")
+            title = "Outcome Trends", status = "primary", solidHeader = TRUE, width = 6,
+            plotOutput("outcomeTrend")
           ),
           box(
             title = "Outcome Statistics", status = "primary", solidHeader = TRUE, width = 6,
@@ -177,7 +191,6 @@ ui <- dashboardPage(
           )
         )
       ),
-      
       tabItem(tabName = "mortality",
               fluidRow(
                 # Controls for dynamic table filtering
@@ -201,16 +214,12 @@ ui <- dashboardPage(
                   title = "Mortality Table",
                   solidHeader = TRUE,
                   width = 12,
-                  plotOutput("mortality_table")
+                  DTOutput("mortality_table")
                 )
               )
       ),
       # Adverse Events Tab
       tabItem(tabName = "adverse",
-              fluidRow(
-                box(title = "Treatment Filter", solidHeader = TRUE, width = 6,
-                    radioButtons(inputId = "TRTMT", label = "Select Treatment Group", choices = c("Placebo", "Treatment"))
-                )),
               fluidRow(
                 # Total Hospitalizations
                 box(
@@ -253,7 +262,7 @@ ui <- dashboardPage(
                   title = "Key Statistics",
                   solidHeader = TRUE,
                   width = 12,
-                  plotOutput("summary_table")
+                  DTOutput("summary_table")
                 )
               )
       )
@@ -261,90 +270,53 @@ ui <- dashboardPage(
   )
 )
 
-server <- function(input, output) {patients_demographics <- reactive({
-  DIG %>%
-    filter(SEX == input$SEX) %>%
-    filter(RACE == input$RACE) %>%
-    filter(AGE >= input$AGE[1] & AGE <=input$AGE[2])
-})
-output$patient_demographics <- renderPlot({ 
-  patients_demographics()%>%
-    ggplot(aes(x = TRTMT, fill = TRTMT)) +
-    geom_bar() +
-    labs(title = "Patient Demographics by Treatment Group",
-         x = "Treatment Group",
-         y = "Count of Patients",
-         fill = "Treatment") +
-    scale_fill_manual(values = c( "blue", "maroon"))
-  
-})
-treatment_choice <- reactive({
-  DIG %>%
-    filter(TRTMT == input$TRTMT)
-})
-output$age_distribution <- renderPlot({ 
-  treatment_choice()%>%
-    ggplot(aes(x = AGE, fill = TRTMT)) +
-    geom_histogram(bins = 80, fill="cyan", color = "black") +
-    labs(title = "Age Distribution",
-         x = "Age",
-         y = "Count of Patients") +
-    scale_fill_manual(values = c("cyan"))
-})
-output$primary_outcome <- renderPlot({
-  treatment_choice()%>%
-    ggplot(aes(x = DWHF, fill = TRTMT)) + 
-    geom_bar(color = "black") +
-    labs(title = "Death or Hospitalisation",
-         x = "Primary Outcome",
-         y = "Count",
-         fill = "Treatment")
-})
-mortality_var <-  reactive({DIG %>%
-    filter(DEATH == input$DEATH)})
-
-output$total_hosp_plot <- renderPlot({
-  treatment_choice()%>%
-    ggplot(aes(x = HOSP, fill = TRTMT)) + 
-    geom_bar(color = "black", fill = "lightblue") +
-    labs(title = "Number of Hospitalisations",
-         x = "Hospitalisations",
-         y = "Count",
-         fill = "Treatment")
-})
-
-
-output$study_summary <- renderDataTable({
-  data_subset <- DIG[, c("ID", "SEX", "AGE", "TRTMT", "HOSP", "DEATH", "DEATHDAY")]
-  colnames(data_subset) <- c("Patient ID", "Gender", "Age", "Treatment Group", "Hospitalized", "Status", "Death Day")
-  data_subset
+server <- function(input, output) { # Add Overview Tab Metrics
+  output$total_patients <- renderValueBox({
+    valueBox(value = nrow(DIG), subtitle = "Total Patients", icon = icon("user")) # Highlighted: Added for total patients
   })
-
-patients<-DIG%>%
-  group_by(TRTMT)%>%
-  summarise(patients = n())
-mortality_rates <- DIG %>%
-  group_by(TRTMT) %>%
-  summarise(mortality_rate = mean(DEATH == "Death", na.rm = TRUE))
-
-hospitalization_rates <- DIG %>%
-  group_by(TRTMT) %>%
-  summarise(hosp_rate = mean(HOSP == "Yes", na.rm = TRUE))
-hospitalization_rates
-summary_table <- left_join(mortality_rates, hospitalization_rates, by = "TRTMT")
-summary_table <- left_join(summary_table, patients, by = "TRTMT")
-
-output$summary_table <- renderTable({summary_table %>%
-  select(
-    Treatment_Group = TRTMT,
-    Total_Patients = patients,
-    Mortality_Rate = mortality_rate,
-    Hospitalization_Rate = hosp_rate
-  )})
-
-
-
-
+  output$mortality_rate <- renderValueBox({
+    rate <- mean(DIG$DEATH == "Death") * 100
+    valueBox(value = paste0(round(rate, 2), "%"), subtitle = "Mortality Rate", icon = icon("skull-crossbones")) # Highlighted: Added for mortality rate
+  })
+  
+  # Mortality Table Logic
+  filtered_mortality <- reactive({
+    if (input$mortality_filter == "All") {
+      DIG
+    } else {
+      DIG %>% filter(DEATH == input$mortality_filter) # Highlighted: Added reactive filtering for mortality
+    }
+  })
+  
+  output$mortality_table <- renderDT({
+    filtered_mortality() %>%
+      group_by(.data[[input$mortality_var]]) %>%
+      summarise(
+        Alive = sum(DEATH == "Alive"),
+        Deceased = sum(DEATH == "Death"),
+        Mortality_Rate = round((Deceased / (Alive + Deceased)) * 100, 2)
+      )
+  }) # Highlighted: Updated mortality logic
+  
+  # Summary Table for Overview
+  patients <- DIG %>% group_by(TRTMT) %>% summarise(patients = n())
+  mortality_rates <- DIG %>% group_by(TRTMT) %>% summarise(mortality_rate = mean(DEATH == "Death", na.rm = TRUE))
+  hospitalization_rates <- DIG %>% group_by(TRTMT) %>% summarise(hosp_rate = mean(HOSP == "Yes", na.rm = TRUE))
+  
+  summary_table <- left_join(mortality_rates, hospitalization_rates, by = "TRTMT")
+  summary_table <- left_join(summary_table, patients, by = "TRTMT")
+  
+  output$summary_table <- renderDT({
+    summary_table %>%
+      select(
+        Treatment_Group = TRTMT,
+        Total_Patients = patients,
+        Mortality_Rate = mortality_rate,
+        Hospitalization_Rate = hosp_rate
+      )
+  }) # Highlighted: Updated for interactivity using renderDT
 }
+
+shinyApp(ui = ui, server = server)
 
 shinyApp(ui = ui, server = server)
