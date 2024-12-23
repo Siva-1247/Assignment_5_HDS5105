@@ -127,10 +127,8 @@ ui <- dashboardPage(
                     radioButtons(inputId = "RACE", label = "Select Patient Race", choices = c("White", "Non-white")),
                     radioButtons(inputId = "SEX", label = "Select Patient Sex", choices = c("Female", "Male")),
                     sliderInput("AGE", "Select Age Range:", min = 20, max = 100, value = c(40, 50))),
-
+                
                 box(title = "Age Distribution", solidHeader = TRUE, width = 12,
-                    radioButtons(inputId = "RACE", label = "Select Patient Race", choices = c("White", "Non-white")),
-                    radioButtons(inputId = "SEX", label = "Select Patient Sex", choices = c("Female", "Male")),
                     radioButtons(inputId = "TRTMT", label = "Select Treatment Group", choices = c("Placebo", "Treatment"))
                 )
               ),
@@ -271,14 +269,12 @@ output$patient_demographics <- renderPlot({
 })
 age_distribution <- reactive({
   DIG %>%
-    filter(SEX == input$SEX) %>%
-    filter(RACE == input$RACE) %>%
     filter(TRTMT == input$TRTMT)
 })
 output$age_distribution <- renderPlot({ 
   age_distribution()%>%
     ggplot(aes(x = AGE, fill = TRTMT)) +
-    geom_bar() +
+    geom_histogram(bins = 80, fill="cyan", color = "black") +
     labs(title = "Age Distribution",
          x = "Age",
          y = "Count of Patients") +
