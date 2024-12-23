@@ -1,6 +1,30 @@
 library(shiny)
 library(shinydashboard)
 library(shinyWidgets)
+library(readr)
+DIG <- read_csv("DIG.csv")
+
+
+DIG$SEX<-as.factor(DIG$SEX)
+DIG$TRTMT<-as.factor(DIG$TRTMT)
+DIG$HYPERTEN<-as.factor(DIG$HYPERTEN)
+DIG$CVD<- as.factor(DIG$CVD)
+DIG$WHF<- as.factor(DIG$WHF)
+DIG$DIG<- as.factor(DIG$DIG)
+DIG$HOSP<- as.factor(DIG$HOSP) 
+DIG$DEATH<-as.factor(DIG$DEATH)
+DIG$AGE<-as.numeric(DIG$AGE)
+DIG$RACE<-as.factor(DIG$RACE)
+
+DIG$TRTMT <- factor(DIG$TRTMT, levels = c("0", "1"), labels = c("Placebo", "Treatment"))
+DIG$DEATH <- factor(DIG$DEATH, levels = c("0", "1"), labels = c("Alive", "Death"))
+DIG$SEX <- factor(DIG$SEX, levels = c("1", "2"), labels = c("Male", "Female"))
+DIG$HYPERTEN<-factor(DIG$HYPERTEN, levels= c("0", "1"), labels = c("No", "Yes"))
+DIG$CVD<-factor(DIG$CVD, levels = c("0", "1"), labels = c("No", "Yes"))
+DIG$WHF<-factor(DIG$WHF, levels = c("0", "1"), labels = c("No", "Yes"))
+DIG$DIG<-factor(DIG$DIG, levels = c("0", "1"), labels = c("No", "Yes"))
+DIG$HOSP<-factor(DIG$HOSP, levels = c("0", "1"), labels = c("No", "Yes"))
+DIG$RACE<-factor(DIG$RACE, levels = c("1", "2"), labels = c("White", "Non-white"))
 
 # UI Code
 ui <- dashboardPage(
@@ -68,22 +92,22 @@ ui <- dashboardPage(
           color: #6a4e3c !important;              /* Deep brown text */
         }
       "))
-     ),
+    ),
     
     tabItems(
       # Overview Tab
       tabItem(tabName = "overview",
               fluidRow(
                 box(
-                title = "Summary Statistics",
-                solidHeader = TRUE,
-                width = 12,
-                fluidRow(
-                  column(width = 3, valueBoxOutput("total_patients")),
-                  column(width = 3, valueBoxOutput("mortality_rate")),
-                  column(width = 3, valueBoxOutput("hospitalization_rate")),
-                  column(width = 3, valueBoxOutput("median_followup"))
-              ))),
+                  title = "Summary Statistics",
+                  solidHeader = TRUE,
+                  width = 12,
+                  fluidRow(
+                    column(width = 3, valueBoxOutput("total_patients")),
+                    column(width = 3, valueBoxOutput("mortality_rate")),
+                    column(width = 3, valueBoxOutput("hospitalization_rate")),
+                    column(width = 3, valueBoxOutput("median_followup"))
+                  ))),
               fluidRow(
                 # Key Findings Box
                 box(
@@ -96,33 +120,26 @@ ui <- dashboardPage(
       ),
       
       # Demographics Tab
+      
       tabItem(tabName = "demographics",
               fluidRow(
-                # Gender and Race Distribution
-                box(
-                  title = "Patient Demographics",
-                  solidHeader = TRUE,
-                  width = 6,
-                  plotOutput("gender_race_plot")
-                ),
-                # Age Distribution
-                box(
-                  title = "Age Distribution",
-                  solidHeader = TRUE,
-                  width = 6,
-                  plotOutput("age_dist_plot")
+                box(title = "Filter Demographics", solidHeader = TRUE, width = 12,
+                    radioButtons(inputId = "RACE", label = "Select Patient Race", choices = c("White", "Non-white")),
+                    radioButtons(inputId = "SEX", label = "Select Patient Sex", choices = c("Female", "Male")),
+                    sliderInput("AGE", "Select Age Range:", min = 20, max = 100, value = c(40, 50))),
+
+                box(title = "Age Distribution", solidHeader = TRUE, width = 12,
+                    radioButtons(inputId = "RACE", label = "Select Patient Race", choices = c("White", "Non-white")),
+                    radioButtons(inputId = "SEX", label = "Select Patient Sex", choices = c("Female", "Male")),
+                    radioButtons(inputId = "TRTMT", label = "Select Treatment Group", choices = c("Placebo", "Treatment"))
                 )
               ),
               fluidRow(
-                # Age by Treatment Group
-                box(
-                  title = "Age by Treatment Group",
-                  solidHeader = TRUE,
-                  width = 12,
-                  plotOutput("age_treatment_plot")
-                )
+                box(title = "Patient Demographics", solidHeader = TRUE, width = 6, plotOutput("patient_demographics")),
+                box(title = "Age Distribution", solidHeader = TRUE, width = 6, plotOutput("age_distribution"))
               )
       ),
+      
       tabItem(tabName = "clinical",
               fluidRow(
                 box(
@@ -179,7 +196,7 @@ ui <- dashboardPage(
                   title = "Mortality Table",
                   solidHeader = TRUE,
                   width = 12,
-                  DTOutput("mortality_table")
+                  plotOutput("mortality_table")
                 )
               )
       ),
@@ -227,13 +244,45 @@ ui <- dashboardPage(
                   title = "Key Statistics",
                   solidHeader = TRUE,
                   width = 12,
-                  DTOutput("summary_table")
+                  plotOutput("summary_table")
                 )
               )
       )
     )
   )
 )
-server <- function(input, output) { }
 
+server <- function(input, output) {patients_demographics <- reactive({
+  DIG %>%
+    filter(SEX == input$SEX) %>%
+    filter(RACE == input$RACE) %>%
+    filter(AGE >= input$AGE[1] & AGE <=input$AGE[2])
+})
+output$patient_demographics <- renderPlot({ 
+  patients_demographics()%>%
+    ggplot(aes(x = TRTMT, fill = TRTMT)) +
+    geom_bar() +
+    labs(title = "Patient Demographics by Treatment Group",
+         x = "Treatment Group",
+         y = "Count of Patients",
+         fill = "Treatment") +
+    scale_fill_manual(values = c( "blue", "maroon"))
+  
+})
+age_distribution <- reactive({
+  DIG %>%
+    filter(SEX == input$SEX) %>%
+    filter(RACE == input$RACE) %>%
+    filter(TRTMT == input$TRTMT)
+})
+output$age_distribution <- renderPlot({ 
+  age_distribution()%>%
+    ggplot(aes(x = AGE, fill = TRTMT)) +
+    geom_bar() +
+    labs(title = "Age Distribution",
+         x = "Age",
+         y = "Count of Patients") +
+    scale_fill_manual(values = c("cyan"))
+})
+}
 shinyApp(ui = ui, server = server)
