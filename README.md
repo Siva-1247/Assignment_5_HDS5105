@@ -43,3 +43,7 @@ Provides visual insights into the frequency and distribution of these events.
 Highlights key risk factors and their hazard ratios through forest plots.
 Includes a correlation heatmap to visualize relationships between clinical variables.
 Features a summary statistics table for risk-related metrics
+
+**Contribution**
+UI and report with minor edits to server code - Sivagami Nedumaran
+Server Coding - Brendan Woods
