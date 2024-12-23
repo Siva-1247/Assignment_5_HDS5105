@@ -4,35 +4,10 @@ library(shinyWidgets)
 library(readr)
 library(DT)
 library(dplyr)
+library(corrplot)
 
-DIG <- read_csv("DIG.csv")
 
-
-DIG$SEX<-as.factor(DIG$SEX)
-DIG$TRTMT<-as.factor(DIG$TRTMT)
-DIG$HYPERTEN<-as.factor(DIG$HYPERTEN)
-DIG$CVD<- as.factor(DIG$CVD)
-DIG$WHF<- as.factor(DIG$WHF)
-DIG$DIG<- as.factor(DIG$DIG)
-DIG$HOSP<- as.factor(DIG$HOSP) 
-DIG$DEATH<-as.factor(DIG$DEATH)
-DIG$AGE<-as.numeric(DIG$AGE)
-DIG$RACE<-as.factor(DIG$RACE)
-DIG$DWHF<-as.factor(DIG$DWHF)
-DIG$DIABETES<-as.factor(DIG$DIABETES)
-
-DIG$TRTMT <- factor(DIG$TRTMT, levels = c("0", "1"), labels = c("Placebo", "Treatment"))
-DIG$DEATH <- factor(DIG$DEATH, levels = c("0", "1"), labels = c("Alive", "Death"))
-DIG$SEX <- factor(DIG$SEX, levels = c("1", "2"), labels = c("Male", "Female"))
-DIG$HYPERTEN<-factor(DIG$HYPERTEN, levels= c("0", "1"), labels = c("No", "Yes"))
-DIG$CVD<-factor(DIG$CVD, levels = c("0", "1"), labels = c("No", "Yes"))
-DIG$WHF<-factor(DIG$WHF, levels = c("0", "1"), labels = c("No", "Yes"))
-DIG$DIG<-factor(DIG$DIG, levels = c("0", "1"), labels = c("No", "Yes"))
-DIG$HOSP<-factor(DIG$HOSP, levels = c("0", "1"), labels = c("No", "Yes"))
-DIG$RACE<-factor(DIG$RACE, levels = c("1", "2"), labels = c("White", "Non-white"))
-DIG$DWHF<-factor(DIG$DWHF, levels = c("0", "1"), labels = c("Alive", "Death/Hospitalisation"))
-DIG$DIABETES<-factor(DIG$DIABETES, levels = c("0", "1"), labels = c("No", "Yes"))
-
+DIG_data <- read.csv("DIG.csv")
 # UI Code
 ui <- dashboardPage(
   dashboardHeader(title = "DIG Trial Analysis Dashboard", titleWidth = 300),
@@ -270,53 +245,133 @@ ui <- dashboardPage(
   )
 )
 
-server <- function(input, output) { # Add Overview Tab Metrics
+server <- function(input, output, session) {
+  
+  # Overview Tab Outputs
   output$total_patients <- renderValueBox({
-    valueBox(value = nrow(DIG), subtitle = "Total Patients", icon = icon("user")) # Highlighted: Added for total patients
+    valueBox(value = nrow(DIG_data), subtitle = "Total Patients", icon = icon("user"))
   })
+  
   output$mortality_rate <- renderValueBox({
-    rate <- mean(DIG$DEATH == "Death") * 100
-    valueBox(value = paste0(round(rate, 2), "%"), subtitle = "Mortality Rate", icon = icon("skull-crossbones")) # Highlighted: Added for mortality rate
+    rate <- mean(DIG_data$DEATH == "Deceased") * 100
+    valueBox(value = paste0(round(rate, 2), "%"), subtitle = "Mortality Rate", icon = icon("skull-crossbones"))
   })
   
-  # Mortality Table Logic
-  filtered_mortality <- reactive({
-    if (input$mortality_filter == "All") {
-      DIG
-    } else {
-      DIG %>% filter(DEATH == input$mortality_filter) # Highlighted: Added reactive filtering for mortality
-    }
+  output$hospitalization_rate <- renderValueBox({
+    rate <- mean(DIG_data$HOSP == 1) * 100
+    valueBox(value = paste0(round(rate, 2), "%"), subtitle = "Hospitalization Rate", icon = icon("hospital"))
   })
   
+  output$median_followup <- renderValueBox({
+    value <- median(DIG_data$DEATHDAY, na.rm = TRUE)
+    valueBox(value = paste(value, "days"), subtitle = "Median Follow-up", icon = icon("calendar"))
+  })
+  
+  output$study_summary <- renderText({
+    "This dashboard summarizes key metrics from the DIG trial, including demographic distributions, clinical measures, outcomes, and risk analyses. Explore each tab for detailed visualizations and statistics."
+  })
+  
+  # Demographics Tab Outputs
+  output$gender_race_plot <- renderPlot({
+    ggplot(DIG_data, aes(x = SEX, fill = RACE)) +
+      geom_bar(position = "dodge") +
+      labs(title = "Gender and Race Distribution", x = "Gender", y = "Count", fill = "Race")
+  })
+  
+  output$age_dist_plot <- renderPlot({
+    ggplot(DIG_data, aes(x = AGE)) +
+      geom_histogram(bins = 20, fill = "steelblue", color = "white") +
+      labs(title = "Age Distribution", x = "Age", y = "Count")
+  })
+  
+  output$age_treatment_plot <- renderPlot({
+    ggplot(DIG_data, aes(x = TRTMT, y = AGE)) +
+      geom_boxplot(fill = "lightblue") +
+      labs(title = "Age by Treatment Group", x = "Treatment Group", y = "Age")
+  })
+  
+  # Clinical Data Tab Outputs
+  updateSelectInput(session, "clinicalVariable", choices = colnames(DIG_data)[7:15])
+  
+  filtered_data <- reactive({
+    DIG_data[DIG_data$AGE >= input$ageRange[1] & DIG_data$AGE <= input$ageRange[2], ]
+  })
+  
+  output$clinicalPlot <- renderPlot({
+    ggplot(filtered_data(), aes_string(x = "AGE", y = input$clinicalVariable)) +
+      geom_point() +
+      labs(title = "Clinical Measure by Age", x = "Age", y = input$clinicalVariable)
+  })
+  
+  # Patient Outcomes Tab Outputs
+  output$outcomeTrend <- renderPlot({
+    ggplot(DIG_data, aes(x = DEATHDAY, fill = DEATH)) +
+      geom_histogram(bins = 20) +
+      labs(title = "Outcome Trends Over Time", x = "Days Since Randomization", y = "Count", fill = "Outcome")
+  })
+  
+  output$outcomeSummary <- renderPrint({
+    summary(DIG_data[, c("DEATHDAY", "HOSP")])
+  })
+  
+  # Mortality Tab Outputs
   output$mortality_table <- renderDT({
-    filtered_mortality() %>%
+    # Filter data based on mortality status
+    filtered_data <- if (input$mortality_filter == "All") {
+      DIG_data
+    } else {
+      DIG_data[DIG_data$DEATH == input$mortality_filter, ]
+    }
+    
+    # Calculate mortality rates stratified by selected variable
+    mortality_summary <- filtered_data %>%
       group_by(.data[[input$mortality_var]]) %>%
-      summarise(
+      dplyr::summarise(
         Alive = sum(DEATH == "Alive"),
-        Deceased = sum(DEATH == "Death"),
+        Deceased = sum(DEATH == "Deceased"),
         Mortality_Rate = round((Deceased / (Alive + Deceased)) * 100, 2)
-      )
-  }) # Highlighted: Updated mortality logic
+      ) %>%
+      dplyr::arrange(desc(Mortality_Rate)) # Use explicit namespace
+    
+    # Display as a datatable
+    datatable(
+      mortality_summary,
+      options = list(pageLength = 5, autoWidth = TRUE),
+      rownames = FALSE
+    )
+  })
   
-  # Summary Table for Overview
-  patients <- DIG %>% group_by(TRTMT) %>% summarise(patients = n())
-  mortality_rates <- DIG %>% group_by(TRTMT) %>% summarise(mortality_rate = mean(DEATH == "Death", na.rm = TRUE))
-  hospitalization_rates <- DIG %>% group_by(TRTMT) %>% summarise(hosp_rate = mean(HOSP == "Yes", na.rm = TRUE))
   
-  summary_table <- left_join(mortality_rates, hospitalization_rates, by = "TRTMT")
-  summary_table <- left_join(summary_table, patients, by = "TRTMT")
+  # Adverse Events Tab Outputs
+  output$total_hosp_plot <- renderPlot({
+    ggplot(DIG_data, aes(x = HOSP)) +
+      geom_bar(fill = "red") +
+      labs(title = "Total Hospitalizations", x = "Hospitalization Status", y = "Count")
+  })
+  
+  output$death_cause_plot <- renderPlot({
+    ggplot(DIG_data, aes(x = factor(REASON))) +
+      geom_bar(fill = "purple") +
+      labs(title = "Cause of Death Distribution", x = "Cause", y = "Count")
+  })
+  
+  # Risk Analysis Tab Outputs
+  output$forest_plot <- renderPlot({
+    ggplot(DIG_data, aes(x = TRTMT, y = HEARTRTE)) +
+      geom_boxplot(fill = "coral") +
+      labs(title = "Hazard Ratios by Treatment Group", x = "Treatment", y = "Heart Rate")
+  })
+  
+  output$correlation_plot <- renderPlot({
+    cor_data <- cor(DIG_data[, sapply(DIG_data, is.numeric)], use = "complete.obs")
+    corrplot::corrplot(cor_data, method = "circle", type = "upper", tl.col = "black", tl.cex = 0.8)
+  })
   
   output$summary_table <- renderDT({
-    summary_table %>%
-      select(
-        Treatment_Group = TRTMT,
-        Total_Patients = patients,
-        Mortality_Rate = mortality_rate,
-        Hospitalization_Rate = hosp_rate
-      )
-  }) # Highlighted: Updated for interactivity using renderDT
+    summary_stats <- DIG_data %>%
+      summarise(across(where(is.numeric), ~ round(mean(.x, na.rm = TRUE), 2)))
+    datatable(summary_stats, rownames = FALSE, options = list(pageLength = 5))
+  })
 }
-
-shinyApp(ui = ui, server = server)
 
 shinyApp(ui = ui, server = server)
